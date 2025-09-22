@@ -1,53 +1,51 @@
 import streamlit as st
-import requests
 import pandas as pd
 import matplotlib.pyplot as plt
 
-st.title("🌦 5-Day Weather Forecast Dashboard")
+st.title("📚 Student Marks Analyzer & Grade Calculator")
 
-API_KEY = "YOUR_API_KEY"  # Get free key from https://openweathermap.org/api
-city = st.text_input("Enter a city name", "Chennai")
+uploaded_file = st.file_uploader("Upload CSV file with student marks", type=["csv"])
 
-if st.button("Get Forecast"):
-    if API_KEY == "YOUR_API_KEY":
-        st.error("Please add your OpenWeatherMap API key in the code.")
+def calculate_grade(avg):
+    if avg >= 90:
+        return "A+"
+    elif avg >= 75:
+        return "A"
+    elif avg >= 60:
+        return "B"
+    elif avg >= 40:
+        return "C"
     else:
-        url = f"http://api.openweathermap.org/data/2.5/forecast?q={city}&appid={API_KEY}&units=metric"
-        response = requests.get(url)
+        return "F"
 
-        if response.status_code == 200:
-            data = response.json()
-            forecast_list = data["list"]
+if uploaded_file is not None:
+    df = pd.read_csv(uploaded_file)
 
-            forecast_data = []
-            for item in forecast_list:
-                forecast_data.append({
-                    "Datetime": item["dt_txt"],
-                    "Temp": item["main"]["temp"],
-                    "Feels Like": item["main"]["feels_like"],
-                    "Humidity": item["main"]["humidity"],
-                    "Description": item["weather"][0]["description"].capitalize()
-                })
+    # Calculate total and average
+    subjects = df.columns[1:]  # Assuming first column is Name
+    df["Total"] = df[subjects].sum(axis=1)
+    df["Average"] = df["Total"] / len(subjects)
+    df["Grade"] = df["Average"].apply(calculate_grade)
 
-            df = pd.DataFrame(forecast_data)
+    st.subheader("📊 Calculated Results")
+    st.dataframe(df)
 
-            # Show preview
-            st.subheader(f"📍 5-Day Forecast for {city}")
-            st.dataframe(df.head(10))
+    # Top 5 students chart
+    st.subheader("🏆 Top 5 Performers")
+    top_students = df.sort_values(by="Average", ascending=False).head(5)
+    fig, ax = plt.subplots()
+    ax.bar(top_students["Name"], top_students["Average"])
+    ax.set_ylabel("Average Marks")
+    ax.set_title("Top 5 Students")
+    st.pyplot(fig)
 
-            # Daily average temperature
-            df["Date"] = pd.to_datetime(df["Datetime"]).dt.date
-            daily_avg = df.groupby("Date")["Temp"].mean()
+    # Grade distribution chart
+    st.subheader("📈 Grade Distribution")
+    grade_counts = df["Grade"].value_counts()
+    fig2, ax2 = plt.subplots()
+    ax2.pie(grade_counts, labels=grade_counts.index, autopct='%1.1f%%')
+    ax2.set_title("Grade Distribution")
+    st.pyplot(fig2)
 
-            # Plot
-            fig, ax = plt.subplots()
-            daily_avg.plot(kind="line", marker="o", ax=ax)
-            ax.set_title(f"Average Temperature for Next 5 Days in {city}")
-            ax.set_ylabel("Temperature (°C)")
-            ax.set_xlabel("Date")
-            plt.xticks(rotation=45)
-            st.pyplot(fig)
-
-            st.success("✅ Forecast loaded successfully!")
-        else:
-            st.error("City not found. Please try again.")
+else:
+    st.info("Please upload a CSV file to analyze marks.")
